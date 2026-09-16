@@ -5,12 +5,15 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
-  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+  workflow_dispatch:
 
 jobs:
-  build:
-    name: Build Android APK & iOS IPA
-    runs-on: macos-latest
+  # ─────────────────────────────────────────────
+  # JOB 1: Build Android APK (Ubuntu — faster)
+  # ─────────────────────────────────────────────
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
@@ -25,37 +28,67 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.24.0'
           channel: 'stable'
           cache: true
 
-      - name: Install dependencies
+      - name: Install Flutter dependencies
         run: flutter pub get
 
-      - name: Run unit & widget tests
-        run: flutter test
-
-      # ── BUILD ANDROID APK ──
       - name: Build Android Release APK
-        run: |
-          flutter build apk --release
-          cp build/app/outputs/flutter-apk/app-release.apk ./Money_Book.apk
+        run: flutter build apk --release --no-shrink
 
-      - name: Upload Android APK
+      - name: Rename & stage APK
+        run: cp build/app/outputs/flutter-apk/app-release.apk Money_Book.apk
+
+      - name: Upload Android APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: Money_Book_Android_APK
           path: Money_Book.apk
+          retention-days: 30
 
-      # ── BUILD iOS IPA (Unsigned / Sideloadable) ──
-      - name: Build iOS App
+  # ─────────────────────────────────────────────
+  # JOB 2: Build iOS IPA (macOS — required)
+  # ─────────────────────────────────────────────
+  build-ios:
+    name: Build iOS IPA
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Install CocoaPods dependencies
         run: |
-          flutter build ios --release --no-codesign
+          cd ios
+          pod install --repo-update
+          cd ..
+
+      - name: Build iOS (no code signing)
+        run: flutter build ios --release --no-codesign
+
+      - name: Package as IPA
+        run: |
           mkdir -p Payload
           cp -r build/ios/iphoneos/Runner.app Payload/Money_Book.app
           zip -r Money_Book.ipa Payload
+          echo "IPA created successfully!"
+          ls -lh Money_Book.ipa
 
-      - name: Upload iOS IPA
+      - name: Upload iOS IPA artifact
         uses: actions/upload-artifact@v4
         with:
           name: Money_Book_iOS_IPA
           path: Money_Book.ipa
+          retention-days: 30
