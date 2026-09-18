@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/expense_provider.dart';
 import '../providers/user_provider.dart';
+import '../providers/sync_provider.dart';
 import '../widgets/budget_card.dart';
 import '../constants/categories.dart';
 import '../theme/app_theme.dart';
@@ -79,6 +81,7 @@ class _BudgetTabState extends State<BudgetTab> {
               onPressed: () {
                 final limit = double.tryParse(amountController.text.trim()) ?? 0;
                 if (limit > 0) {
+                  HapticFeedback.mediumImpact();
                   Provider.of<ExpenseProvider>(context, listen: false).setBudget(
                     category: selectedCat,
                     limitAmount: limit,
@@ -87,7 +90,15 @@ class _BudgetTabState extends State<BudgetTab> {
                   );
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Budget for $selectedCat updated!')),
+                    SnackBar(
+                      content: Row(
+                        children: [
+                          const Icon(Icons.check_circle_rounded, color: Colors.greenAccent, size: 18),
+                          const SizedBox(width: 8),
+                          Text('Budget for $selectedCat set to $currencySymbol${limit.toStringAsFixed(2)}'),
+                        ],
+                      ),
+                    ),
                   );
                 }
               },
@@ -109,45 +120,60 @@ class _BudgetTabState extends State<BudgetTab> {
     final budgets = provider.budgets.where((b) => b.month == _selectedMonth && b.year == _selectedYear).toList();
     final totalMonthlySpent = provider.getMonthlyExpense(_selectedMonth, _selectedYear);
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header Row with Month Selector
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Monthly Budget',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: -0.5,
+    return RefreshIndicator(
+      color: AppTheme.primaryBlue,
+      onRefresh: () async {
+        HapticFeedback.lightImpact();
+        final syncProvider = Provider.of<SyncProvider>(context, listen: false);
+        await provider.loadData();
+        if (syncProvider.isOnline && syncProvider.isSignedIn) {
+          await syncProvider.syncNow();
+        }
+      },
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Action & Period Row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      DateFormat('MMMM yyyy').format(DateTime(_selectedYear, _selectedMonth)),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: -0.3,
+                      ),
                     ),
-                  ),
-                  Text(
-                    DateFormat('MMMM yyyy').format(DateTime(_selectedYear, _selectedMonth)),
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                    const SizedBox(height: 2),
+                    Text(
+                      'Category limits & spend targets',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              ElevatedButton.icon(
-                onPressed: () => _showSetBudgetDialog(context),
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('Set Budget'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  ],
                 ),
-              ),
-            ],
-          ),
+                FilledButton.icon(
+                  onPressed: () => _showSetBudgetDialog(context),
+                  icon: const Icon(Icons.add_rounded, size: 16),
+                  label: const Text('Set Budget', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppTheme.primaryBlue,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    minimumSize: const Size(0, 36),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ],
+            ),
           const SizedBox(height: 20),
 
           // Total Monthly Spend Banner
@@ -270,6 +296,7 @@ class _BudgetTabState extends State<BudgetTab> {
                           ElevatedButton(
                             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.cashOutRed),
                             onPressed: () {
+                              HapticFeedback.mediumImpact();
                               provider.deleteBudget(budget.id);
                               Navigator.pop(ctx);
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -286,6 +313,7 @@ class _BudgetTabState extends State<BudgetTab> {
               },
             ),
         ],
+      ),
       ),
     );
   }

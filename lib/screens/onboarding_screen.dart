@@ -56,7 +56,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✅ Backup restored successfully! Welcome back.'),
+            content: Text('Backup restored successfully. Welcome back.'),
             backgroundColor: AppTheme.cashInGreen,
           ),
         );
@@ -68,7 +68,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         setState(() => _isRestoring = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('❌ Selected file is not a valid Money Book JSON backup.'),
+            content: Text('Selected file is not a valid Money Book JSON backup.'),
             backgroundColor: AppTheme.cashOutRed,
           ),
         );

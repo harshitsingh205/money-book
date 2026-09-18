@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/transaction_model.dart';
 import '../models/budget_model.dart';
 import '../services/storage_service.dart';
+import '../services/firebase_sync_service.dart';
 
 class ExpenseProvider extends ChangeNotifier {
   List<TransactionModel> _transactions = [];
@@ -156,6 +157,7 @@ class ExpenseProvider extends ChangeNotifier {
     _transactions.insert(0, item);
     await StorageService.saveTransactions(_transactions);
     StorageService.triggerAutoBackup(); // Auto-backup to protected snapshot
+    FirebaseSyncService().scheduleSync(); // Cloud backup (online: immediate, offline: queued)
     notifyListeners();
   }
 
@@ -165,6 +167,7 @@ class ExpenseProvider extends ChangeNotifier {
       _transactions[index] = updated;
       await StorageService.saveTransactions(_transactions);
       StorageService.triggerAutoBackup();
+      FirebaseSyncService().scheduleSync();
       notifyListeners();
     }
   }
@@ -173,18 +176,22 @@ class ExpenseProvider extends ChangeNotifier {
     _transactions.removeWhere((t) => t.id == id);
     await StorageService.saveTransactions(_transactions);
     StorageService.triggerAutoBackup();
+    FirebaseSyncService().scheduleSync();
     notifyListeners();
   }
 
-  Future<void> markDueAsPaid(String id) async {
+  Future<void> markDueAsPaid(String id, [bool isPaid = true]) async {
     final index = _transactions.indexWhere((t) => t.id == id);
     if (index != -1) {
-      _transactions[index] = _transactions[index].copyWith(isPaid: true);
+      _transactions[index] = _transactions[index].copyWith(isPaid: isPaid);
       await StorageService.saveTransactions(_transactions);
       StorageService.triggerAutoBackup();
+      FirebaseSyncService().scheduleSync();
       notifyListeners();
     }
   }
+
+  Future<void> markAsPaid(String id, [bool isPaid = true]) => markDueAsPaid(id, isPaid);
 
   // Budget Actions
   Future<void> setBudget({
@@ -214,6 +221,7 @@ class ExpenseProvider extends ChangeNotifier {
 
     await StorageService.saveBudgets(_budgets);
     StorageService.triggerAutoBackup();
+    FirebaseSyncService().scheduleSync();
     notifyListeners();
   }
 
@@ -221,6 +229,7 @@ class ExpenseProvider extends ChangeNotifier {
     _budgets.removeWhere((b) => b.id == id);
     await StorageService.saveBudgets(_budgets);
     StorageService.triggerAutoBackup();
+    FirebaseSyncService().scheduleSync();
     notifyListeners();
   }
 

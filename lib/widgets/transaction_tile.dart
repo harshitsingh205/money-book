@@ -141,7 +141,7 @@ class TransactionTile extends StatelessWidget {
                 _detailRow(
                   Icons.check_circle_rounded,
                   'Status',
-                  transaction.isPaid ? 'Paid ✓' : 'Pending',
+                  transaction.isPaid ? 'Paid' : 'Pending',
                   isDark,
                   valueColor: transaction.isPaid ? AppTheme.cashInGreen : AppTheme.warningOrange,
                 ),

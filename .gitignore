@@ -48,3 +48,21 @@ app.*.map.json
 *.apk
 *.ipa
 *.aab
+
+# Sensitive credentials & secrets
+google-services.json
+GoogleService-Info.plist
+*.jks
+*.jks.old
+*.keystore
+firebase_options.dart
+PLAY_STORE_CREDENTIALS_AND_INFO.txt
+
+# Log files & archives
+*.zip
+logs*/
+*_extracted/
+
+# Privacy policy & store listing (local only)
+privacy_policy.html
+PLAY_STORE_LISTING.txt

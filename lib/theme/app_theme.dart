@@ -1,23 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 
 class AppTheme {
-  // Brand Colors - Professional White/Black/Blue Theme
-  static const Color primaryBlue = Color(0xFF2563EB); // Royal Blue
+  // Brand Colors - Clean Modern Fintech Theme
+  static const Color primaryBlue = Color(0xFF2563EB); // #2563EB
+  static const Color primaryLight = Color(0xFFEFF6FF); // #EFF6FF
   static const Color primaryBlueDark = Color(0xFF1D4ED8);
-  static const Color accentCyan = Color(0xFF06B6D4);
   
   // Financial Indicators
-  static const Color cashInGreen = Color(0xFF10B981); // Emerald Green
-  static const Color cashOutRed = Color(0xFFEF4444);  // Crimson Red
-  static const Color warningOrange = Color(0xFFF59E0B);
+  static const Color cashInGreen = Color(0xFF16A34A); // #16A34A
+  static const Color cashOutRed = Color(0xFFDC2626);  // #DC2626
+  static const Color warningOrange = Color(0xFFF59E0B); // #F59E0B
   
   // Light Mode Colors
-  static const Color lightBg = Color(0xFFF8FAFC); // Slate 50
+  static const Color lightBg = Color(0xFFF8FAFC); // Slate 50 (#F8FAFC)
   static const Color lightSurface = Colors.white;
   static const Color lightCard = Color(0xFFFFFFFF);
-  static const Color lightTextPrimary = Color(0xFF0F172A); // Slate 900
-  static const Color lightTextSecondary = Color(0xFF64748B); // Slate 500
-  static const Color lightBorder = Color(0xFFE2E8F0); // Slate 200
+  static const Color lightTextPrimary = Color(0xFF172033); // Slate 900 (#172033)
+  static const Color lightTextSecondary = Color(0xFF64748B); // Slate 500 (#64748B)
+  static const Color lightBorder = Color(0xFFE2E8F0); // Slate 200 (#E2E8F0)
 
   // Dark Mode Colors
   static const Color darkBg = Color(0xFF0F172A); // Slate 900
@@ -35,7 +36,7 @@ class AppTheme {
       scaffoldBackgroundColor: lightBg,
       colorScheme: const ColorScheme.light(
         primary: primaryBlue,
-        secondary: accentCyan,
+        secondary: primaryBlue,
         surface: lightSurface,
         onSurface: lightTextPrimary,
         error: cashOutRed,
@@ -109,6 +110,18 @@ class AppTheme {
           ),
         ),
       ),
+      splashFactory: InkSparkle.splashFactory,
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+        },
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        elevation: 6,
+      ),
       chipTheme: ChipThemeData(
         backgroundColor: lightBg,
         selectedColor: primaryBlue.withAlpha(30),
@@ -131,7 +144,7 @@ class AppTheme {
       scaffoldBackgroundColor: darkBg,
       colorScheme: const ColorScheme.dark(
         primary: primaryBlue,
-        secondary: accentCyan,
+        secondary: primaryBlue,
         surface: darkSurface,
         onSurface: darkTextPrimary,
         error: cashOutRed,
@@ -204,6 +217,18 @@ class AppTheme {
             fontWeight: FontWeight.w600,
           ),
         ),
+      ),
+      splashFactory: InkSparkle.splashFactory,
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+        },
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        elevation: 6,
       ),
       chipTheme: ChipThemeData(
         backgroundColor: darkBg,

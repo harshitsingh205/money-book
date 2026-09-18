@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/expense_provider.dart';
+import '../providers/sync_provider.dart';
 import '../widgets/transaction_tile.dart';
 import '../constants/categories.dart';
 import '../theme/app_theme.dart';
+import 'cash_out_screen.dart';
 
 class TransactionsTab extends StatefulWidget {
   const TransactionsTab({super.key});
@@ -159,52 +162,120 @@ class _TransactionsTabState extends State<TransactionsTab> {
 
           // Transaction List
           Expanded(
-            child: items.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.search_off_rounded,
-                          size: 56,
-                          color: (isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary)
-                              .withAlpha(120),
+            child: RefreshIndicator(
+              color: AppTheme.primaryBlue,
+              onRefresh: () async {
+                HapticFeedback.lightImpact();
+                final syncProvider = Provider.of<SyncProvider>(context, listen: false);
+                await provider.loadData();
+                if (syncProvider.isOnline && syncProvider.isSignedIn) {
+                  await syncProvider.syncNow();
+                }
+              },
+              child: items.isEmpty
+                  ? SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 60),
+                        alignment: Alignment.center,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryBlue.withAlpha(20),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.receipt_long_rounded,
+                                size: 48,
+                                color: AppTheme.primaryBlue,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              provider.searchQuery.isNotEmpty || provider.selectedCategory != 'All' || provider.selectedType != 'All'
+                                  ? 'No matching transactions'
+                                  : 'No transactions recorded yet',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              provider.searchQuery.isNotEmpty || provider.selectedCategory != 'All' || provider.selectedType != 'All'
+                                  ? 'Try changing or clearing your search filters'
+                                  : 'Add your first income or expense to start tracking',
+                              style: const TextStyle(fontSize: 13, color: Colors.grey),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            if (provider.searchQuery.isNotEmpty || provider.selectedCategory != 'All' || provider.selectedType != 'All')
+                              OutlinedButton.icon(
+                                onPressed: () {
+                                  HapticFeedback.selectionClick();
+                                  _searchController.clear();
+                                  provider.clearFilters();
+                                },
+                                icon: const Icon(Icons.filter_alt_off_rounded, size: 16),
+                                label: const Text('Clear Filters'),
+                              )
+                            else
+                              ElevatedButton.icon(
+                                onPressed: () {
+                                  HapticFeedback.selectionClick();
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const CashOutScreen()),
+                                  );
+                                },
+                                icon: const Icon(Icons.add_rounded),
+                                label: const Text('Record Transaction'),
+                              ),
+                          ],
                         ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'No matching transactions found.',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                      ),
+                    )
+                  : ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                      itemCount: items.length,
+                      itemBuilder: (context, index) {
+                        final tx = items[index];
+                        return _AnimatedTxItem(
+                          index: index,
+                          child: TransactionTile(
+                            transaction: tx,
+                            onDelete: () {
+                              HapticFeedback.mediumImpact();
+                              provider.deleteTransaction(tx.id);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Row(
+                                    children: [
+                                      const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 18),
+                                      const SizedBox(width: 8),
+                                      Expanded(child: Text('${tx.title} deleted')),
+                                    ],
+                                  ),
+                                  action: SnackBarAction(
+                                    label: 'Undo',
+                                    textColor: Colors.amberAccent,
+                                    onPressed: () {
+                                      HapticFeedback.lightImpact();
+                                      provider.addTransaction(tx);
+                                    },
+                                  ),
+                                ),
+                              );
+                            },
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Try clearing search or filters.',
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
-                        ),
-                      ],
+                        );
+                      },
                     ),
-                  )
-                : ListView.builder(
-                    itemCount: items.length,
-                    itemBuilder: (context, index) {
-                      final tx = items[index];
-                      return _AnimatedTxItem(
-                        index: index,
-                        child: TransactionTile(
-                          transaction: tx,
-                          onDelete: () {
-                            provider.deleteTransaction(tx.id);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Transaction deleted')),
-                            );
-                          },
-                        ),
-                      );
-                    },
-                  ),
+            ),
           ),
         ],
       ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 
@@ -24,6 +25,7 @@ class _BalanceCardState extends State<BalanceCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _shimmerCtrl;
   late Animation<double> _shimmerAnim;
+  bool _isBalanceHidden = false;
 
   @override
   void initState() {
@@ -61,23 +63,20 @@ class _BalanceCardState extends State<BalanceCard>
         width: double.infinity,
         padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(18),
           gradient: const LinearGradient(
             colors: [
               Color(0xFF1E3A8A),
-              Color(0xFF1E40AF),
               Color(0xFF2563EB),
-              Color(0xFF3B82F6),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           boxShadow: [
             BoxShadow(
-              color: AppTheme.primaryBlue.withAlpha(90),
-              blurRadius: 22,
-              offset: const Offset(0, 8),
-              spreadRadius: -2,
+              color: AppTheme.primaryBlue.withAlpha(50),
+              blurRadius: 14,
+              offset: const Offset(0, 5),
             ),
           ],
         ),
@@ -116,14 +115,36 @@ class _BalanceCardState extends State<BalanceCard>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Total Net Balance',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 0.8,
-                ),
+              Row(
+                children: [
+                  const Text(
+                    'Total Net Balance',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      setState(() => _isBalanceHidden = !_isBalanceHidden);
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(4.0),
+                      child: Icon(
+                        _isBalanceHidden
+                            ? Icons.visibility_off_rounded
+                            : Icons.visibility_rounded,
+                        color: Colors.white70,
+                        size: 18,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               if (savingsRate != null)
                 Container(
@@ -173,13 +194,20 @@ class _BalanceCardState extends State<BalanceCard>
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
-            child: Text(
-              currencyFormatter.format(widget.totalBalance),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 36,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -1,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
+              child: Text(
+                _isBalanceHidden
+                    ? '${widget.currencySymbol} ••••••••'
+                    : currencyFormatter.format(widget.totalBalance),
+                key: ValueKey(_isBalanceHidden),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 36,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -1,
+                ),
               ),
             ),
           ),
@@ -199,14 +227,18 @@ class _BalanceCardState extends State<BalanceCard>
                 icon: Icons.arrow_downward_rounded,
                 iconBg: AppTheme.cashInGreen,
                 label: 'Cash In',
-                value: currencyFormatter.format(widget.totalCashIn),
+                value: _isBalanceHidden
+                    ? '••••••'
+                    : currencyFormatter.format(widget.totalCashIn),
               ),
               const SizedBox(width: 12),
               _statChip(
                 icon: Icons.arrow_upward_rounded,
                 iconBg: AppTheme.cashOutRed,
                 label: 'Cash Out',
-                value: currencyFormatter.format(widget.totalCashOut),
+                value: _isBalanceHidden
+                    ? '••••••'
+                    : currencyFormatter.format(widget.totalCashOut),
               ),
             ],
           ),

@@ -1,0 +1,25 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Money Book: User Data Isolation ─────────────────────────────────────
+    // Each authenticated user has full read/write access to only their own
+    // data under `users/{uid}/`. No cross-user access is permitted.
+    // Unauthenticated (guest-mode) users cannot read or write to Firestore.
+    //
+    // Data structure:
+    //   users/{uid}/backup/latest  ← full JSON snapshot (transactions + budgets)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null
+                         && request.auth.uid == userId;
+    }
+
+    // Deny all other paths by default.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../models/transaction_model.dart';
@@ -9,8 +10,9 @@ import '../theme/app_theme.dart';
 
 class CashInScreen extends StatefulWidget {
   final TransactionModel? transactionToEdit;
+  final double? initialAmount;
 
-  const CashInScreen({super.key, this.transactionToEdit});
+  const CashInScreen({super.key, this.transactionToEdit, this.initialAmount});
 
   @override
   State<CashInScreen> createState() => _CashInScreenState();
@@ -35,8 +37,10 @@ class _CashInScreenState extends State<CashInScreen> {
       _noteController.text = t.note;
       _selectedCategory = t.category;
       _selectedDate = t.date;
-    } else {
-      _titleController.text = 'Income Received';
+    } else if (widget.initialAmount != null && widget.initialAmount! > 0) {
+      _amountController.text = widget.initialAmount! % 1 == 0
+          ? widget.initialAmount!.toInt().toString()
+          : widget.initialAmount!.toStringAsFixed(2);
     }
   }
 
@@ -64,6 +68,7 @@ class _CashInScreenState extends State<CashInScreen> {
 
   void _saveCashIn() {
     if (_formKey.currentState!.validate()) {
+      HapticFeedback.mediumImpact();
       final amount = double.parse(_amountController.text.trim());
       final provider = Provider.of<ExpenseProvider>(context, listen: false);
 
@@ -175,6 +180,33 @@ class _CashInScreenState extends State<CashInScreen> {
                   if (double.parse(val.trim()) <= 0) return 'Amount must be > 0';
                   return null;
                 },
+              ),
+              const SizedBox(height: 8),
+
+              // Quick Amount Increment Chips
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [100, 500, 1000, 2000, 5000].map((amt) {
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8.0),
+                      child: ActionChip(
+                        avatar: const Icon(Icons.add_rounded, size: 14, color: AppTheme.cashInGreen),
+                        label: Text('+$amt', style: const TextStyle(fontWeight: FontWeight.w600)),
+                        onPressed: () {
+                          HapticFeedback.lightImpact();
+                          final current = double.tryParse(_amountController.text.trim()) ?? 0;
+                          final updated = current + amt;
+                          setState(() {
+                            _amountController.text = updated % 1 == 0
+                                ? updated.toInt().toString()
+                                : updated.toStringAsFixed(2);
+                          });
+                        },
+                      ),
+                    );
+                  }).toList(),
+                ),
               ),
               const SizedBox(height: 16),
 

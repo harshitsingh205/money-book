@@ -99,7 +99,7 @@ void main() {
         ),
       ),
     );
-    expect(find.text('OVER BUDGET!'), findsOneWidget);
+    expect(find.text('Over Budget'), findsOneWidget);
   });
 
   testWidgets('TransactionTile displays title, category, and formatted amount', (WidgetTester tester) async {

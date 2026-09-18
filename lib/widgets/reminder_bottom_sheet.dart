@@ -207,21 +207,21 @@ class _ReminderBottomSheetState extends State<ReminderBottomSheet> {
                 child: Row(
                   children: [
                     ChoiceChip(
-                      label: const Text('👔 Professional'),
+                      label: const Text('Professional'),
                       selected: _selectedStyle == ReminderStyle.professional,
                       selectedColor: AppTheme.primaryBlue.withAlpha(40),
                       onSelected: (_) => _onStyleChanged(ReminderStyle.professional),
                     ),
                     const SizedBox(width: 8),
                     ChoiceChip(
-                      label: const Text('😊 Friendly'),
+                      label: const Text('Friendly'),
                       selected: _selectedStyle == ReminderStyle.friendly,
                       selectedColor: AppTheme.cashInGreen.withAlpha(40),
                       onSelected: (_) => _onStyleChanged(ReminderStyle.friendly),
                     ),
                     const SizedBox(width: 8),
                     ChoiceChip(
-                      label: const Text('⚠️ Urgent'),
+                      label: const Text('Urgent'),
                       selected: _selectedStyle == ReminderStyle.urgent,
                       selectedColor: AppTheme.cashOutRed.withAlpha(40),
                       onSelected: (_) => _onStyleChanged(ReminderStyle.urgent),

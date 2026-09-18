@@ -34,7 +34,7 @@ class BudgetCard extends StatelessWidget {
 
     if (ratio >= 1.0) {
       statusColor = AppTheme.cashOutRed;
-      statusText = 'OVER BUDGET!';
+      statusText = 'Over Budget';
     } else if (ratio >= 0.8) {
       statusColor = AppTheme.warningOrange;
       statusText = 'Near Limit (${(ratio * 100).toInt()}%)';
@@ -47,7 +47,7 @@ class BudgetCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark ? AppTheme.darkCard : AppTheme.lightCard,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: ratio >= 1.0
               ? AppTheme.cashOutRed.withAlpha(120)

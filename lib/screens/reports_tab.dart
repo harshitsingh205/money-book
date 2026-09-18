@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:share_plus/share_plus.dart';
 import '../providers/expense_provider.dart';
 import '../providers/user_provider.dart';
 import '../theme/app_theme.dart';
@@ -16,65 +18,170 @@ class ReportsTab extends StatefulWidget {
 
 class _ReportsTabState extends State<ReportsTab> {
   int _selectedMonth = DateTime.now().month;
-  final int _selectedYear = DateTime.now().year;
+  int _selectedYear = DateTime.now().year;
+
+  void _previousMonth() {
+    HapticFeedback.selectionClick();
+    setState(() {
+      if (_selectedMonth == 1) {
+        _selectedMonth = 12;
+        _selectedYear--;
+      } else {
+        _selectedMonth--;
+      }
+    });
+  }
+
+  void _nextMonth() {
+    HapticFeedback.selectionClick();
+    setState(() {
+      if (_selectedMonth == 12) {
+        _selectedMonth = 1;
+        _selectedYear++;
+      } else {
+        _selectedMonth++;
+      }
+    });
+  }
+
+  void _exportReportSummary(
+    BuildContext context, {
+    required double income,
+    required double expense,
+    required double net,
+    required Map<String, double> categoryMap,
+    required String currencySymbol,
+  }) {
+    HapticFeedback.lightImpact();
+    final monthName = DateFormat('MMMM yyyy').format(DateTime(_selectedYear, _selectedMonth));
+    final format = NumberFormat.currency(symbol: currencySymbol, decimalDigits: 2);
+
+    final buffer = StringBuffer();
+    buffer.writeln('Money Book Financial Summary');
+    buffer.writeln('Period: $monthName');
+    buffer.writeln('------------------------------');
+    buffer.writeln('Total Income:   ${format.format(income)}');
+    buffer.writeln('Total Expense:  ${format.format(expense)}');
+    buffer.writeln('Net Balance:    ${format.format(net)}');
+    final savingsRate = income > 0 ? ((net / income) * 100).toStringAsFixed(1) : '0.0';
+    buffer.writeln('Savings Rate:   $savingsRate%');
+    buffer.writeln('');
+    if (categoryMap.isNotEmpty) {
+      buffer.writeln('Category Breakdown:');
+      final sorted = categoryMap.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+      for (final e in sorted) {
+        final pct = expense > 0 ? (e.value / expense * 100).toStringAsFixed(1) : '0';
+        buffer.writeln('• ${e.key}: ${format.format(e.value)} ($pct%)');
+      }
+    }
+    buffer.writeln('------------------------------');
+    buffer.writeln('Generated via Money Book');
+
+    SharePlus.instance.share(
+      ShareParams(
+        text: buffer.toString(),
+        subject: 'Financial Report - $monthName',
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<ExpenseProvider>(context);
-    final currencySymbol = Provider.of<UserProvider>(context, listen: false).currencySymbol;
+    final userProvider = Provider.of<UserProvider>(context);
+    final currencySymbol = userProvider.currencySymbol;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final currencyFormat = NumberFormat.currency(symbol: currencySymbol, decimalDigits: 2);
 
     final income = provider.getMonthlyIncome(_selectedMonth, _selectedYear);
     final expense = provider.getMonthlyExpense(_selectedMonth, _selectedYear);
-    final remaining = income - expense;
+    final net = income - expense;
+    final savingsRate = income > 0 ? ((net / income) * 100) : 0.0;
 
     final categoryMap = provider.getCategoryExpensesMap(_selectedMonth, _selectedYear);
+    final sortedCategories = categoryMap.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    final monthDate = DateTime(_selectedYear, _selectedMonth);
+    final monthLabel = DateFormat('MMMM yyyy').format(monthDate);
+
+    final daysInMonth = DateTime(_selectedYear, _selectedMonth + 1, 0).day;
+    final dailyAvgExpense = daysInMonth > 0 ? (expense / daysInMonth) : 0.0;
+
+    final monthlyTxList = provider.transactions.where((t) {
+      return t.date.month == _selectedMonth && t.date.year == _selectedYear;
+    }).toList();
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header & Month Selector
+          // ── 1. MONTH SELECTOR & EXPORT ACTION ──
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Financial Reports',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: -0.5,
+              Container(
+                decoration: BoxDecoration(
+                  color: isDark ? AppTheme.darkCard : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left_rounded, size: 20),
+                      onPressed: _previousMonth,
+                      tooltip: 'Previous Month',
+                      visualDensity: VisualDensity.compact,
                     ),
-                  ),
-                  SizedBox(height: 2),
-                  Text(
-                    'Monthly analytics & category breakdowns',
-                    style: TextStyle(fontSize: 13, color: Colors.grey),
-                  ),
-                ],
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      child: Text(
+                        monthLabel,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right_rounded, size: 20),
+                      onPressed: _nextMonth,
+                      tooltip: 'Next Month',
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ],
+                ),
               ),
-              DropdownButton<int>(
-                value: _selectedMonth,
-                items: List.generate(12, (index) => index + 1).map((m) {
-                  return DropdownMenuItem(
-                    value: m,
-                    child: Text(DateFormat('MMM').format(DateTime(2026, m))),
-                  );
-                }).toList(),
-                onChanged: (val) {
-                  if (val != null) setState(() => _selectedMonth = val);
-                },
+              OutlinedButton.icon(
+                onPressed: () => _exportReportSummary(
+                  context,
+                  income: income,
+                  expense: expense,
+                  net: net,
+                  categoryMap: categoryMap,
+                  currencySymbol: currencySymbol,
+                ),
+                icon: const Icon(Icons.share_outlined, size: 15, color: AppTheme.primaryBlue),
+                label: const Text('Export', style: TextStyle(fontSize: 12.5, color: AppTheme.primaryBlue, fontWeight: FontWeight.w600)),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  minimumSize: const Size(0, 36),
+                  side: BorderSide(color: AppTheme.primaryBlue.withAlpha(80)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
 
-          // 3 Metric Overview Cards (Monthly Income, Monthly Expense, Remaining Balance)
+          // ── 2. METRIC OVERVIEW CARDS (Fintech 3-Grid) ──
           Row(
             children: [
               Expanded(
@@ -86,7 +193,7 @@ class _ReportsTabState extends State<ReportsTab> {
                   isDark: isDark,
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: _metricCard(
                   title: 'Expenses',
@@ -96,213 +203,370 @@ class _ReportsTabState extends State<ReportsTab> {
                   isDark: isDark,
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: _metricCard(
                   title: 'Net Saved',
-                  amount: currencyFormat.format(remaining),
-                  color: remaining >= 0 ? AppTheme.primaryBlue : AppTheme.warningOrange,
-                  icon: Icons.account_balance_wallet_rounded,
+                  amount: currencyFormat.format(net),
+                  color: net >= 0 ? AppTheme.primaryBlue : AppTheme.cashOutRed,
+                  icon: Icons.account_balance_wallet_outlined,
                   isDark: isDark,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 24),
-
-          // Income vs Expense Comparison Bar Chart Section
-          const Text(
-            'Income vs Expense Overview',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
           const SizedBox(height: 12),
-          Container(
-            height: 220,
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: isDark ? AppTheme.darkCard : AppTheme.lightCard,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
-              ),
-            ),
-            child: BarChart(
-              BarChartData(
-                alignment: BarChartAlignment.spaceAround,
-                maxY: (income > expense ? income : expense) * 1.25 + 10,
-                barTouchData: BarTouchData(enabled: false),
-                titlesData: FlTitlesData(
-                  show: true,
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      getTitlesWidget: (value, meta) {
-                        switch (value.toInt()) {
-                          case 0:
-                            return const Text('Income', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12));
-                          case 1:
-                            return const Text('Expenses', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12));
-                          default:
-                            return const Text('');
-                        }
-                      },
-                    ),
-                  ),
-                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+
+          // Savings Rate Progress Card
+          if (income > 0) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: isDark ? AppTheme.darkCard : Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
                 ),
-                gridData: const FlGridData(show: false),
-                borderData: FlBorderData(show: false),
-                barGroups: [
-                  BarChartGroupData(
-                    x: 0,
-                    barRods: [
-                      BarChartRodData(
-                        toY: income,
-                        color: AppTheme.cashInGreen,
-                        width: 32,
-                        borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Monthly Savings Rate',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                        ),
+                      ),
+                      Text(
+                        '${savingsRate.toStringAsFixed(1)}%',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: net >= 0 ? AppTheme.cashInGreen : AppTheme.cashOutRed,
+                        ),
                       ),
                     ],
                   ),
-                  BarChartGroupData(
-                    x: 1,
-                    barRods: [
-                      BarChartRodData(
-                        toY: expense,
-                        color: AppTheme.cashOutRed,
-                        width: 32,
-                        borderRadius: BorderRadius.circular(8),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: income > 0 ? (net > 0 ? (net / income).clamp(0.0, 1.0) : 0.0) : 0.0,
+                      minHeight: 6,
+                      backgroundColor: isDark ? Colors.white10 : const Color(0xFFF1F5F9),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        net >= 0 ? AppTheme.cashInGreen : AppTheme.cashOutRed,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // ── 3. CASH FLOW VISUALIZATION BAR ──
+          if (income > 0 || expense > 0) ...[
+            _sectionHeader('Cash Flow Ratio'),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDark ? AppTheme.darkCard : Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+                ),
+              ),
+              child: Column(
+                children: [
+                  // Dual ratio bar
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: SizedBox(
+                      height: 14,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: (income * 100).toInt().clamp(1, 1000000),
+                            child: Container(color: AppTheme.cashInGreen),
+                          ),
+                          Expanded(
+                            flex: (expense * 100).toInt().clamp(1, 1000000),
+                            child: Container(color: AppTheme.cashOutRed),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(width: 8, height: 8, decoration: const BoxDecoration(color: AppTheme.cashInGreen, shape: BoxShape.circle)),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Income: ${((income / (income + expense)) * 100).toStringAsFixed(0)}%',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          Container(width: 8, height: 8, decoration: const BoxDecoration(color: AppTheme.cashOutRed, shape: BoxShape.circle)),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Expenses: ${((expense / (income + expense)) * 100).toStringAsFixed(0)}%',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ],
               ),
             ),
-          ),
-          const SizedBox(height: 24),
+            const SizedBox(height: 20),
+          ],
 
-          // Category-wise Breakdown Section
-          const Text(
-            'Category Expenses Breakdown',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 12),
+          // ── 4. CATEGORY EXPENSES BREAKDOWN ──
+          _sectionHeader('Spending by Category'),
+          const SizedBox(height: 10),
 
           if (categoryMap.isEmpty)
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(32),
+              padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
               decoration: BoxDecoration(
-                color: isDark ? AppTheme.darkCard : AppTheme.lightCard,
-                borderRadius: BorderRadius.circular(20),
+                color: isDark ? AppTheme.darkCard : Colors.white,
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
                 ),
               ),
-              child: const Center(
-                child: Text('No expense data for this month.'),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.pie_chart_outline_rounded,
+                    size: 40,
+                    color: (isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary).withAlpha(100),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'No expenses recorded for this month',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Tap Cash Out to record expenses and track analytics',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                    ),
+                  ),
+                ],
               ),
             )
           else ...[
-            // Pie Chart Widget
+            // Donut chart card
             Container(
-              height: 200,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: isDark ? AppTheme.darkCard : AppTheme.lightCard,
-                borderRadius: BorderRadius.circular(20),
+                color: isDark ? AppTheme.darkCard : Colors.white,
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
                 ),
               ),
-              child: PieChart(
-                PieChartData(
-                  sectionsSpace: 3,
-                  centerSpaceRadius: 40,
-                  sections: categoryMap.entries.map((entry) {
-                    final catInfo = AppCategories.getCategory(entry.key);
-                    final percentage = expense > 0 ? (entry.value / expense * 100) : 0.0;
-                    return PieChartSectionData(
-                      color: catInfo.color,
-                      value: entry.value,
-                      title: '${percentage.toStringAsFixed(0)}%',
-                      radius: 50,
-                      titleStyle: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+              child: Column(
+                children: [
+                  SizedBox(
+                    height: 180,
+                    child: PieChart(
+                      PieChartData(
+                        sectionsSpace: 2,
+                        centerSpaceRadius: 46,
+                        sections: sortedCategories.map((entry) {
+                          final catInfo = AppCategories.getCategory(entry.key);
+                          final pct = expense > 0 ? (entry.value / expense * 100) : 0.0;
+                          return PieChartSectionData(
+                            color: catInfo.color,
+                            value: entry.value,
+                            title: pct >= 8 ? '${pct.toStringAsFixed(0)}%' : '',
+                            radius: 38,
+                            titleStyle: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          );
+                        }).toList(),
                       ),
-                    );
-                  }).toList(),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Category List Progress Items
-            ...categoryMap.entries.map((entry) {
-              final catInfo = AppCategories.getCategory(entry.key);
-              final ratio = expense > 0 ? (entry.value / expense) : 0.0;
-              return Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: isDark ? AppTheme.darkCard : AppTheme.lightCard,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: catInfo.color.withAlpha(30),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(catInfo.icon, color: catInfo.color, size: 20),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
+                  ),
+                  const SizedBox(height: 12),
+                  // Ranked categories list
+                  ...sortedCategories.map((entry) {
+                    final catInfo = AppCategories.getCategory(entry.key);
+                    final pct = expense > 0 ? (entry.value / expense) : 0.0;
+
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                entry.key,
-                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              Container(
+                                width: 28,
+                                height: 28,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: catInfo.color.withAlpha(25),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Icon(catInfo.icon, size: 15, color: catInfo.color),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  entry.key,
+                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+                                ),
                               ),
                               Text(
+                                '${(pct * 100).toStringAsFixed(1)}%',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
                                 currencyFormat.format(entry.value),
-                                style: const TextStyle(fontWeight: FontWeight.bold),
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 5),
                           ClipRRect(
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: BorderRadius.circular(3),
                             child: LinearProgressIndicator(
-                              value: ratio,
-                              minHeight: 6,
-                              backgroundColor: isDark ? AppTheme.darkBg : AppTheme.lightBg,
+                              value: pct.clamp(0.0, 1.0),
+                              minHeight: 4,
+                              backgroundColor: isDark ? Colors.white10 : const Color(0xFFF1F5F9),
                               valueColor: AlwaysStoppedAnimation<Color>(catInfo.color),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
-                ),
-              );
-            }),
+                    );
+                  }),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
           ],
+
+          // ── 5. MONTHLY INSIGHTS & STATS ──
+          _sectionHeader('Monthly Insights'),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.darkCard : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+              ),
+            ),
+            child: Column(
+              children: [
+                _insightRow(
+                  icon: Icons.receipt_long_outlined,
+                  label: 'Recorded Transactions',
+                  value: '${monthlyTxList.length} items',
+                  isDark: isDark,
+                ),
+                Divider(height: 16, color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+                _insightRow(
+                  icon: Icons.calendar_today_outlined,
+                  label: 'Average Daily Spend',
+                  value: currencyFormat.format(dailyAvgExpense),
+                  isDark: isDark,
+                ),
+                if (sortedCategories.isNotEmpty) ...[
+                  Divider(height: 16, color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+                  _insightRow(
+                    icon: Icons.local_fire_department_outlined,
+                    label: 'Top Spending Category',
+                    value: '${sortedCategories.first.key} (${currencyFormat.format(sortedCategories.first.value)})',
+                    isDark: isDark,
+                  ),
+                ],
+              ],
+            ),
+          ),
         ],
       ),
+    );
+  }
+
+  Widget _sectionHeader(String title) {
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: 15,
+        fontWeight: FontWeight.bold,
+        letterSpacing: -0.2,
+      ),
+    );
+  }
+
+  Widget _insightRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    required bool isDark,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: AppTheme.primaryBlue),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 
@@ -314,10 +578,10 @@ class _ReportsTabState extends State<ReportsTab> {
     required bool isDark,
   }) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkCard : AppTheme.lightCard,
-        borderRadius: BorderRadius.circular(16),
+        color: isDark ? AppTheme.darkCard : Colors.white,
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
         ),
@@ -327,28 +591,31 @@ class _ReportsTabState extends State<ReportsTab> {
         children: [
           Row(
             children: [
-              Icon(icon, color: color, size: 16),
+              Icon(icon, size: 14, color: color),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(fontSize: 11, color: Colors.grey),
-                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 6),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              amount,
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 14,
-                color: color,
-              ),
+          Text(
+            amount,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: color,
+              letterSpacing: -0.2,
             ),
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
